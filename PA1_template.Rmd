@@ -20,20 +20,16 @@ library(lattice)
 
 ```
 
-Optionally set the working directory, needs to contain the activity.zip
-
-```{r}
-
-setwd("/Users/danielthornton/workspace/Data Science/Reproducible_Research/week_2/RepData_PeerAssessment1")
-```
-
 ## Load data
 
 Read in the data and include the necessary libraries, assuming the activity.zip exists in the current working directory
 
 ```{r}
 library(lattice) 
-unzip("activity.zip")
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl,destfile = paste0(getwd(), '/activity.zip'), method = "curl")
+unzip("activity.zip",exdir = "data")
 data <- read.csv("activity.csv")
 
 ```
@@ -41,7 +37,7 @@ data <- read.csv("activity.csv")
 ## Daily activity
 
 ```{r}
-# Histrogram of the steps per day
+# Histogram of the steps per day
 steps_per_day <- aggregate(data[, c('steps')], list(data$date), FUN = function(x) sum(x, na.rm = TRUE))
 colnames(steps_per_day) <- c('Date','Steps')
 hist(steps_per_day$Steps, xlab="steps per day", breaks=40, main="Histogram of total steps per day")
@@ -117,10 +113,9 @@ The mean number of steps is: `r new_mean_steps`
 
 The median number of steps is: `r new_median_steps`
 
-## Compare weekday to weekend activity
+## Compare weekday and weekend activity
 
 Plot the comparison of weekend activity to weekday activity, based on 5 minute windows of activity recording.
-
 
 ```{r warning=FALSE}
 # Use a factor for the day of week
