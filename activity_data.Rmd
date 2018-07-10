@@ -1,0 +1,148 @@
+---
+title: "Reproducible Research: Assignment 1"
+author: "Daniel Thornton"
+date: "10/07/2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+This document processes and describes data taken from personal movement using activity monitoring devices
+
+## Setup
+
+Set default options and install the right libraries
+
+```{r setup, include=TRUE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(lattice) 
+
+```
+
+Optionally set the working directory, needs to contain the activity.zip
+
+```{r}
+
+setwd("/Users/danielthornton/workspace/Data Science/Reproducible_Research/week_2/RepData_PeerAssessment1")
+```
+
+## Load data
+
+Read in the data and include the necessary libraries, assuming the activity.zip exists in the current working directory
+
+```{r}
+library(lattice) 
+unzip("activity.zip")
+data <- read.csv("activity.csv")
+
+```
+
+## Daily activity
+
+```{r}
+# Histrogram of the steps per day
+steps_per_day <- aggregate(data[, c('steps')], list(data$date), FUN = function(x) sum(x, na.rm = TRUE))
+colnames(steps_per_day) <- c('Date','Steps')
+hist(steps_per_day$Steps, xlab="steps per day", breaks=40, main="Histogram of total steps per day")
+```
+
+```{r}
+mean_steps_per_day <- mean(steps_per_day$Steps)
+median_steps_per_day <- median(steps_per_day$Steps)
+```
+
+Mean steps in the data per day: `r mean_steps_per_day`
+
+Median steps in the data per day: `r median_steps_per_day`
+
+## Interval activity
+
+```{r}
+# Time series of steps per 5 minute window, averaged across all days
+steps_per_window <- aggregate(data[, c('steps')], list(data$interval), FUN = function(x) mean(x, na.rm = TRUE))
+colnames(steps_per_window) <- c('interval','mean_steps')
+
+interval_with_most_steps <- steps_per_window[steps_per_window$mean_steps == max(steps_per_window$mean_steps),]$interval
+
+plot(steps_per_window, type="l", xlab="5 min time interval starting from 00:00 hours", ylab="Steps")
+```
+
+The interval with the largest mean number of steps is interval no. `r interval_with_most_steps`
+
+## Finding and imputating missing values
+
+```{r}
+# How many rows with NAs in the original data
+rows_with_missing_data <- nrow(data[!complete.cases(data), ])
+```
+
+There are `r rows_with_missing_data` rows with missing values for the step count.
+
+To patch the missing values, the average for that time interval taken from the other days is used, recorded in the steps_per_window variable, and joined onto the original data. 
+
+```{r}
+# Patch up the rows with missing data and plot a histogram of the new data
+
+rows_with_missing_data <- data[!complete.cases(data$steps), ]
+rows_without_missing_data <- data[complete.cases(data$steps), ]
+
+rows_with_missing_data <- merge(rows_with_missing_data, steps_per_window, by.x="interval", by.y="interval")
+rows_with_missing_data$steps <- as.integer(round(rows_with_missing_data$mean_steps))
+rows_with_missing_data <- rows_with_missing_data[,c(1:3)]
+
+new_data <- rbind(rows_with_missing_data, rows_without_missing_data)
+new_data <- new_data[order(new_data$date,new_data$interval),]
+
+```
+
+```{r}
+# Plot steps per day using the new imputed data
+steps_per_day_new <- aggregate(new_data[, c('steps')], list(new_data$date), FUN = function(x) sum(x, na.rm = TRUE))
+colnames(steps_per_day_new) <- c('date','steps')
+hist(steps_per_day_new$steps, xlab="steps per day", breaks=40, main="Histogram of total steps per day with imputation")
+```
+
+```{r}
+# Check the mean and median of the new imputed data
+new_total_steps <- sum(steps_per_day_new$steps, na.rm=TRUE)
+new_mean_steps <- mean(steps_per_day_new$steps, na.rm=TRUE)
+new_median_steps <- median(steps_per_day_new$steps, na.rm=TRUE)
+
+```
+
+After imputing missing values where the data on step count was missing:
+
+The mean number of steps is: `r new_mean_steps`
+
+The median number of steps is: `r new_median_steps`
+
+## Compare weekday to weekend activity
+
+Plot the comparison of weekend activity to weekday activity, based on 5 minute windows of activity recording.
+
+
+```{r warning=FALSE}
+# Use a factor for the day of week
+
+new_data$day <- weekdays(as.Date(new_data$date))
+weekends <- new_data[new_data$day %in% c('Saturday','Sunday'),]
+weekends$day <- factor('weekend')
+weekdays <- new_data[new_data$day %in% c('Monday','Tuesday','Wednesday','Thursday','Friday'),]
+weekdays$day <- factor('weekday')
+new_data_new <- rbind(weekends,weekdays)
+
+weekdays_steps_per_day <- aggregate(weekdays[, c('steps')], list(weekdays$interval), FUN = function(x) mean(x, na.rm = TRUE))
+colnames(weekdays_steps_per_day) <- c('interval','mean_steps')
+weekdays_steps_per_day$day_type <- c('weekday')
+
+weekend_steps_per_day <- aggregate(weekends[, c('steps')], list(weekends$interval), FUN = function(x) mean(x, na.rm = TRUE))
+colnames(weekend_steps_per_day) <- c('interval','mean_steps')
+weekend_steps_per_day$day_type <- c('weekend')
+
+by_day_type <- rbind(weekdays_steps_per_day, weekend_steps_per_day)
+
+xyplot(by_day_type$mean_steps~by_day_type$interval | by_day_type$day_type, xlab="Interval", ylab="Number of steps",layout=c(1,2), type="l", title="Plot of the number of steps per 5 minute window comparing weekend to weekdays.")
+
+```
+
